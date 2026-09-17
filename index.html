@@ -365,12 +365,25 @@
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────
 const PROPERTIES = [
-  { id: '1626', name: 'Property 1626', budget: 608.33 },
-  { id: '1819', name: 'Property 1819', budget: 358.33 },
+  { id: '1626', name: 'Property 1626', budget: 0 },
+  { id: '1819', name: 'Property 1819', budget: 0 },
 ];
 
 // ── STATE ────────────────────────────────────────────────────────────────
 function storageKey(propId, month) { return `rsc_${propId}_${month}`; }
+
+// Budgets were zeroed out; wipe any receipts still stored in this browser.
+// Runs once per browser — bump the key to force another reset.
+const RESET_KEY = 'rsc_reset_v1';
+function purgeStoredData() {
+  try {
+    if (localStorage.getItem(RESET_KEY)) return;
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('rsc_') && k !== RESET_KEY)
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(RESET_KEY, '1');
+  } catch {}
+}
 
 function getReceipts(propId, month) {
   try { return JSON.parse(localStorage.getItem(storageKey(propId, month))) || []; }
@@ -415,8 +428,8 @@ function buildCard(prop, month) {
   const receipts = getReceipts(prop.id, month);
   const spent = receipts.reduce((s, r) => s + r.amount, 0);
   const remaining = prop.budget - spent;
-  const pct = Math.min(100, (spent / prop.budget) * 100);
-  const warn = remaining < prop.budget * 0.2;
+  const pct = prop.budget > 0 ? Math.min(100, (spent / prop.budget) * 100) : (spent > 0 ? 100 : 0);
+  const warn = prop.budget > 0 ? remaining < prop.budget * 0.2 : spent > 0;
 
   const card = document.createElement('div');
   card.className = 'card';
@@ -531,7 +544,7 @@ function deleteReceipt(propId, month, idx) {
 
 // ── HELPERS ──────────────────────────────────────────────────────────────
 function fmt(n) {
-  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function today() {
   const d = new Date();
@@ -551,6 +564,7 @@ function toast(msg) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────
+purgeStoredData();
 buildMonthOptions();
 render();
 </script>
