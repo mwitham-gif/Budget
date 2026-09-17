@@ -161,6 +161,9 @@
     .meter-remaining.warn { color: var(--accent-warn); }
     .meter-remaining.ok   { color: var(--accent-ok); }
 
+    /* No budget set: the row stands alone, with no track below it. */
+    .meter-area.no-budget .meter-row { margin-bottom: 0; }
+
     .track {
       height: 8px;
       background: var(--surface2);
@@ -206,6 +209,7 @@
     .input-row input[type="number"],
     .input-row input[type="text"] {
       flex: 1;
+      min-width: 0;   /* allow shrinking so the Add button stays inside the card */
       font-family: 'DM Sans', sans-serif;
       font-size: 14px;
       background: var(--bg);
@@ -427,19 +431,14 @@ function render() {
 function buildCard(prop, month) {
   const receipts = getReceipts(prop.id, month);
   const spent = receipts.reduce((s, r) => s + r.amount, 0);
+  const hasBudget = prop.budget > 0;
   const remaining = prop.budget - spent;
-  const pct = prop.budget > 0 ? Math.min(100, (spent / prop.budget) * 100) : (spent > 0 ? 100 : 0);
-  const warn = prop.budget > 0 ? remaining < prop.budget * 0.2 : spent > 0;
+  const pct = hasBudget ? Math.min(100, (spent / prop.budget) * 100) : 0;
+  const warn = hasBudget && remaining < prop.budget * 0.2;
 
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.dataset.prop = prop.id;
-
-  card.innerHTML = `
-    <div class="card-header">
-      <div class="prop-label">Property</div>
-      <div class="prop-name">${prop.name}</div>
-    </div>
+  // With no budget to track, the card reports spending only. Set a budget in
+  // PROPERTIES and the meter, remaining figure and warning colors return.
+  const meterHTML = hasBudget ? `
     <div class="meter-area">
       <div class="meter-row">
         <span class="meter-label">Remaining this month</span>
@@ -452,7 +451,24 @@ function buildCard(prop, month) {
         <span>Spent: ${fmt(spent)}</span>
         <span>Budget: ${fmt(prop.budget)}</span>
       </div>
+    </div>` : `
+    <div class="meter-area no-budget">
+      <div class="meter-row">
+        <span class="meter-label">Spent this month</span>
+        <span class="meter-remaining">${fmt(spent)}</span>
+      </div>
+    </div>`;
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.prop = prop.id;
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="prop-label">Property</div>
+      <div class="prop-name">${prop.name}</div>
     </div>
+    ${meterHTML}
     <div class="add-section">
       <label>Add Receipt</label>
       <div class="input-row">
@@ -498,20 +514,23 @@ function renderSummary(month) {
   });
   const remaining = totalBudget - totalSpent;
   const positive = remaining >= 0;
+  const hasBudget = totalBudget > 0;
 
   document.getElementById('summary').innerHTML = `
+    ${hasBudget ? `
     <div class="summary-item">
       <span class="s-label">Combined Budget</span>
       <span class="s-val">${fmt(totalBudget)}</span>
-    </div>
+    </div>` : ''}
     <div class="summary-item">
       <span class="s-label">Total Spent</span>
       <span class="s-val">${fmt(totalSpent)}</span>
     </div>
+    ${hasBudget ? `
     <div class="summary-item">
       <span class="s-label">Total Remaining</span>
       <span class="s-val ${positive ? 'positive' : 'negative'}">${fmt(remaining)}</span>
-    </div>
+    </div>` : ''}
   `;
 }
 
